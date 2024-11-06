@@ -1,0 +1,66 @@
+```{r}
+library(tidyverse)
+library(here)
+library(janitor)
+library(ggplot2)
+library(ragg)
+library(svglite)
+
+source(here("functions", "cleaning.r"))
+source(here("functions", "plotting.r"))
+```
+
+```{r}
+penguins_raw <- read_csv(here("data", "penguins_raw.csv"))
+
+penguins_clean <- read_csv(here("data", "penguins_clean.csv"))
+
+penguins_clean <- penguins_raw %>%
+  clean_column_names() %>%
+  remove_columns(c("comments", "delta")) %>%
+  shorten_species() %>%
+  remove_empty_columns_rows()
+
+
+```
+
+```{r}
+penguins_flippers <- penguins_clean %>% 
+  select(species, flipper_length_mm) %>% 
+  drop_na()
+colnames(penguins_flippers)
+```
+
+Don't use too many individual changes, better to just use a theme
+
+```{r}
+species_colours <- c("Adelaide" = "darkorange",
+                     "Chinstrap" = "purple",
+                     "Gentoo" = "cyan")
+
+flipper_boxplot <- ggplot(
+  data = penguins_flippers, 
+  aes(x = species,
+      y = flipper_length_mm)) + 
+    geom_boxplot(aes(color = species),
+                 show.legend = FALSE,
+                 width = 0.3) +
+  geom_jitter(aes(color = species),
+              show.legend = FALSE,
+              alpha = 0.3,
+              position = position_jitter(
+                width = 0.2,
+                seed = 0,
+              )) +
+  scale_color_manual(values = species_colours)
+  labs(x = "Species",
+       y = "Flipper Length (mm)") +
+    theme_bw()
+  
+flipper_boxplot
+```
+
+```{r}
+agg_png(here("figures", "penguin_boxplot_poster.png"),
+        width = 20, height = 20, )
+```

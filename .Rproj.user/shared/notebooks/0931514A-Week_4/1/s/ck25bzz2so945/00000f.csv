@@ -1,0 +1,29 @@
+"0","penguins_raw <- read_csv(here(""data"", ""penguins_raw.csv""))"
+"2","New names:"
+"2","[1mRows: [22m[34m344[39m [1mColumns: [22m[34m18[39m"
+"2","[36m──[39m [1mColumn specification[22m [36m─────────────────────────────────────────────────────────────────────[39m
+[1mDelimiter:[22m "",""
+[31mchr[39m  (9): studyName, Species, Region, Island, Stage, Individual ID, Clutch Completion, Se...
+[32mdbl[39m  (8): ...1, Sample Number, Culmen Length (mm), Culmen Depth (mm), Flipper Length (mm)...
+[34mdate[39m (1): Date Egg"
+"2","
+[36mℹ[39m Use `spec()` to retrieve the full column specification for this data.
+[36mℹ[39m Specify the column types or set `show_col_types = FALSE` to quiet this message."
+"0","penguins_clean <- read_csv(here(""data"", ""penguins_clean.csv""))"
+"2","New names:"
+"2","[1mRows: [22m[34m344[39m [1mColumns: [22m[34m16[39m"
+"2","[36m──[39m [1mColumn specification[22m [36m─────────────────────────────────────────────────────────────────────[39m
+[1mDelimiter:[22m "",""
+[31mchr[39m  (8): study_name, species, region, island, stage, individual_id, clutch_completion, sex
+[32mdbl[39m  (7): ...1, x, sample_number, culmen_length_mm, culmen_depth_mm, flipper_length_mm, b...
+[34mdate[39m (1): date_egg"
+"2","
+[36mℹ[39m Use `spec()` to retrieve the full column specification for this data.
+[36mℹ[39m Specify the column types or set `show_col_types = FALSE` to quiet this message."
+"0","penguins_clean <- penguins_raw %>%"
+"0","  clean_column_names() %>%"
+"0","  remove_columns(c(""comments"", ""delta"")) %>%"
+"0","  shorten_species() %>%"
+"0","  remove_empty_columns_rows()"
+"0",""
+"0",""

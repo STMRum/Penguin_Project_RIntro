@@ -1,0 +1,173 @@
+#this is renv protected
+
+library(leaflet)
+library(readxl)
+library(tidyr)
+library(geosphere)
+library(osmdata)
+library(sf)
+library(ggplot2)
+library(here)
+
+
+
+data <- read_excel(here("data", "SCAT_DATA_UP2.xlsx"))
+
+View(data)
+
+# Split the 'GPS' column into 'longitude' (X) and 'latitude' (Y)
+data <- data %>%
+  separate(GPS, into = c("latitude", "longitude"), sep = ",", convert = TRUE)
+data$longitude <- as.numeric(data$longitude)
+data$latitude <- as.numeric(data$latitude)
+
+# Plot the data on a map
+leaflet(data = data) %>%
+  addTiles() %>%
+  addCircleMarkers(~longitude, ~latitude, radius = 5, color = "red", popup = ~paste("GPS: ", latitude, longitude))
+
+
+
+#DATA SCRAPING FOR ROADS AND TRAILS
+# Define the bounding box for the area of interest 
+bbox <- c(min_lon = -72.84490440014444, min_lat = -51.03470801729391, max_lon = -72.76762709664617, max_lat = -50.97568707251383)
+bbox_big <- c(min_lon = -72.84490440014444, min_lat = -51.03470801729391, max_lon = -72.58041839966708, max_lat = -50.947167134835404)
+
+
+# Query OpenStreetMap data for roads
+roads <- opq(bbox = bbox_big) %>%
+  add_osm_feature(key = "highway") %>%
+  osmdata_sf()
+
+# Query OpenStreetMap data for trails (footways or paths)
+trails <- opq(bbox = bbox_big) %>%
+  add_osm_feature(key = "highway", value = c("footway", "path")) %>%
+  osmdata_sf()
+
+# View the structure of the data (roads and trails)
+print(roads$osm_lines)
+print(trails$osm_lines)
+
+# Convert roads and trails data into data frames if needed
+roads_df <- st_as_sf(roads$osm_lines)
+trails_df <- st_as_sf(trails$osm_lines)
+
+# Plot the roads and trails using ggplot
+ggplot() +
+  geom_sf(data = roads_df, color = "blue", size = 1) + 
+  geom_sf(data = trails_df, color = "green", size = 1) +
+  theme_minimal() +
+  labs(title = "Roads and Trails in the Area")
+
+# Extract coordinates from the roads and trails data
+roads_coords <- st_coordinates(roads$osm_lines)
+trails_coords <- st_coordinates(trails$osm_lines)
+
+# Combine roads and trails coordinates
+all_coords <- rbind(roads_coords, trails_coords)
+
+all_coords <- as.matrix(all_coords[, c("X", "Y")])  # Assuming all_coords has columns "X" (longitude) and "Y" (latitude)
+
+head(all_coords, 10)
+
+
+
+
+# Split the roads and trails data into individual lines (segments)
+# st_geometry will return a list of geometries for each line (MULTILINESTRING)
+roads_segments <- st_geometry(roads_df)
+trails_segments <- st_geometry(trails_df)
+
+# Convert to data frames for easier plotting
+roads_points <- data.frame(longitude = roads_coords[, "X"], latitude = roads_coords[, "Y"])
+trails_points <- data.frame(longitude = trails_coords[, "X"], latitude = trails_coords[, "Y"])
+
+# Initialize the leaflet map
+#leaflet() %>%
+  #addTiles() %>%
+  
+  # Add scat points
+  #addCircleMarkers(data = data, ~longitude, ~latitude, radius = 5, color = "red", popup = ~paste("Scat Point")) %>%
+  
+  # Add road points
+  #addCircleMarkers(data = roads_points, ~longitude, ~latitude, radius = 0.1, color = "blue", popup = "Road Point") %>%
+  
+  # Add trail points
+  #addCircleMarkers(data = trails_points, ~longitude, ~latitude, radius = 0.1, color = "green", popup = "Trail Point")
+
+
+
+# Ensure scat points, road points, and trail points are matrices of longitude and latitude
+scat_coords <- data[, c("longitude", "latitude")] %>%
+  as.matrix()
+
+road_coords <- roads_points[, c("longitude", "latitude")] %>%
+  as.matrix()
+
+trail_coords <- trails_points[, c("longitude", "latitude")] %>%
+  as.matrix()
+
+# Combine road and trail coordinates into a single matrix
+combined_coords <- rbind(road_coords, trail_coords)
+
+# Calculate the distance matrix (scat points vs. combined road and trail points)
+# The result will be a matrix where each row corresponds to a scat point and each column to a combined road/trail point
+dist_matrix <- distm(scat_coords, combined_coords, fun = distHaversine)
+
+# Find the closest road or trail point for each scat point (the minimum distance in each row)
+closest_combined_indices <- apply(dist_matrix, 1, which.min)
+
+# Extract the closest points (whether road or trail) and distances
+closest_combined_points <- combined_coords[closest_combined_indices, ]
+closest_combined_distances <- apply(dist_matrix, 1, min)
+
+# Combine the scat points with their closest point (either road or trail) and distance
+scat_closest_combined <- data.frame(
+  scat_longitude = scat_coords[, 1],
+  scat_latitude = scat_coords[, 2],
+  combined_longitude = closest_combined_points[, 1],
+  combined_latitude = closest_combined_points[, 2],
+  distance_to_combined = closest_combined_distances
+)
+
+#data$distance_to_trail_metres <- closest_distances
+
+# Create a data frame that contains both scat points and their closest points (either road or trail)
+line_data <- data.frame(
+  scat_longitude = scat_closest_combined$scat_longitude,
+  scat_latitude = scat_closest_combined$scat_latitude,
+  combined_longitude = scat_closest_combined$combined_longitude,
+  combined_latitude = scat_closest_combined$combined_latitude
+)
+
+# Initialize the leaflet map
+map <- leaflet() %>%
+  addTiles() %>%
+  
+  # Add OpenTopoMap tiles for altitude (contour lines)
+  addTiles(urlTemplate = "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
+           attribution = 'Map data: &copy; <a href="https://opentopomap.org">OpenTopoMap</a>') %>%
+  
+  
+  # Add scat points
+  addCircleMarkers(data = data, ~longitude, ~latitude, radius = 5, color = "red", popup = ~paste("Scat Point")) %>%
+  
+  # Add road points
+  addCircleMarkers(data = roads_points, ~longitude, ~latitude, radius = 0.1, color = "blue", popup = "Road Point") %>%
+  
+  # Add trail points
+  addCircleMarkers(data = trails_points, ~longitude, ~latitude, radius = 0.1, color = "green", popup = "Trail Point")
+
+# Now add polylines individually
+for(i in 1:nrow(line_data)) {
+  map <- map %>%
+    addPolylines(lng = c(line_data$scat_longitude[i], line_data$combined_longitude[i]), 
+                 lat = c(line_data$scat_latitude[i], line_data$combined_latitude[i]), 
+                 color = "purple", 
+                 weight = 2, 
+                 opacity = 0.7)
+}
+# Print the map
+map
+
+#data <- line_data
