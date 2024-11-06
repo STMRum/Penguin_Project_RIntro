@@ -36,6 +36,12 @@ View(penguins_clean)
 write.csv(penguins_clean, here("data", "penguins_clean.csv"))
 
 
+
+#test
+#comment
+
+
+
 renv::init()
 renv::diagnostics()
 
